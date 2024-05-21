@@ -1,0 +1,83 @@
+import numpy as np
+import cv2
+from tkinter import filedialog
+
+def generate_gaussian_filter(sigma: int | float, filter_shape: list | tuple | None):
+    # 'sigma' is the standard deviation of the gaussian distribution
+    m, n = filter_shape
+    m_half = m // 2
+    n_half = n // 2
+
+    # initializing the filter
+    gaussian_filter = np.zeros((m, n), np.float32)
+
+    # generating the filter
+    for y in range(-m_half, m_half + 1):
+        for x in range(-n_half, n_half + 1):
+            normal = 1 / (2.0 * np.pi * sigma**2.0)
+            exp_term = np.exp(-(x**2.0 + y**2.0) / (2.0 * sigma**2.0))
+            gaussian_filter[y+m_half, x+n_half] = normal * exp_term
+
+    return gaussian_filter
+
+def convolve(image, kernel):
+    return cv2.filter2D(image, -1, kernel)
+
+def generate_gaussian_stack(image, num_levels, base_sigma):
+    # Create an empty list to store Gaussian filtered images
+    gaussian_stack = []
+
+    # Apply Gaussian filter at multiple scales
+    for level in range(num_levels):
+        sigma = base_sigma * 2**level
+        filter_size = int(4 * sigma + 1)  # Choose filter size based on sigma
+        filter_shape = (filter_size, filter_size)
+        gaussian_filter = generate_gaussian_filter(sigma, filter_shape)
+
+        # Convolve the image with the Gaussian filter
+        filtered_image = convolve(image, gaussian_filter)
+
+        # Add the filtered image to the stack
+        gaussian_stack.append(filtered_image)
+
+    return gaussian_stack
+
+def open_image():
+    file_path = filedialog.askopenfilename()
+    if file_path:
+        img = cv2.imread(file_path)
+        return img
+    return None
+
+# Example usage:
+# Load an image
+image = open_image()
+
+# Number of levels in the Gaussian stack
+num_levels = 5
+
+# Base sigma for the first level
+base_sigma = 1
+
+# Generate the Gaussian stack
+gaussian_stack = generate_gaussian_stack(image, num_levels, base_sigma)
+
+# Display the original image and the Gaussian filtered images in the stack\
+imS = cv2.resize(image, (960, 540))
+cv2.imshow('Original Image', imS)
+
+cv2.waitKey(0)
+
+for i, filtered_image in enumerate(gaussian_stack):
+    imS = cv2.resize(filtered_image, (960, 540))
+    cv2.imshow(f'Level {i + 1}, Sigma: {base_sigma * 2**i:.2f}', imS)
+    
+    cv2.waitKey(0)
+
+final_gaussian_image = gaussian_stack[-1]
+cv2.imshow('Final Gaussian Blur Image', imS)
+cv2.waitKey(0)
+
+# Save the final Gaussian blur image
+cv2.imwrite('final_gaussian_image.jpg', final_gaussian_image)
+cv2.destroyAllWindows()
